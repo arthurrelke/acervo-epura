@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Visualizador do Acervo ÉPURA</title>
+<base target="_blank">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root {
+    --papel: #f3f1ec; --painel: #fbfaf7; --tinta: #2b2a27; --tinta-2: #6f6a60; --linha: #d8d2c6; --linha-forte: #c9c4b8;
+    --liberado: #4f9e98; --interno: #b3ab9b; --nao: #a3324f; --sensivel: #f07c6e; --foco: #2b2a27;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--papel); color: var(--tinta);
+               font: 14px/1.45 Inter, system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 1fr 360px; grid-template-rows: auto 1fr; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+           padding: 14px 20px; border-bottom: 1px solid var(--linha); }
+  h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; margin: 0; }
+  .sub { color: var(--tinta-2); font-size: 12px; }
+  .busca { margin-left: auto; position: relative; }
+  .busca input { width: 260px; padding: 7px 10px; border: 1px solid var(--linha-forte); border-radius: 6px;
+                 background: var(--painel); font: inherit; }
+  .resultados { position: absolute; right: 0; top: 36px; width: 360px; max-height: 320px; overflow: auto; z-index: 5;
+                background: var(--painel); border: 1px solid var(--linha-forte); border-radius: 6px; display: none; }
+  .resultados div { padding: 6px 10px; cursor: pointer; font-size: 12px; border-bottom: 1px solid var(--linha); }
+  .resultados div:hover { background: var(--papel); }
+  main { position: relative; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .link { fill: none; stroke: var(--linha); stroke-width: .8; }
+  .no circle { cursor: pointer; }
+  .rotulo { font-size: 10px; fill: var(--tinta-2); pointer-events: none; paint-order: stroke; stroke: var(--papel); stroke-width: 3px; }
+  .rotulo.forte { font-size: 11px; fill: var(--tinta); font-weight: 500; }
+  aside { border-left: 1px solid var(--linha); background: var(--painel); overflow: auto; padding: 18px 20px; }
+  aside h2 { font-size: 15px; margin: 0 0 4px; word-break: break-word; }
+  .caminho { color: var(--tinta-2); font-size: 12px; word-break: break-word; margin-bottom: 14px; }
+  .numeros { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 0 0 16px; }
+  .numeros dt { color: var(--tinta-2); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .numeros dd { margin: 0 0 6px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .aviso { border-left: 3px solid var(--sensivel); padding: 6px 10px; background: #fdf0ed; font-size: 12px; margin-bottom: 14px; }
+  .rot { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta-2); margin: 14px 0 6px; }
+  .botoes { display: grid; gap: 8px; }
+  .botoes button { text-align: left; padding: 10px 12px; border-radius: 8px; border: 1.5px solid var(--linha-forte);
+                   background: #fff; font: inherit; cursor: pointer; display: flex; gap: 10px; align-items: center; }
+  .botoes button .amostra { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  .botoes button small { display: block; color: var(--tinta-2); font-size: 11px; }
+  .botoes button.ativo { border-color: var(--tinta); box-shadow: 0 0 0 1px var(--tinta) inset; }
+  .estado { font-size: 12px; color: var(--tinta-2); margin-top: 8px; }
+  .limpar { background: none; border: 0; color: var(--tinta-2); text-decoration: underline; cursor: pointer; padding: 0; font: inherit; font-size: 12px; }
+  label.chk { display: flex; gap: 8px; align-items: center; margin-top: 6px; cursor: pointer; }
+  textarea { width: 100%; min-height: 64px; border: 1px solid var(--linha-forte); border-radius: 6px; padding: 8px; font: inherit; background: #fff; }
+  .acoes { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+  .acoes button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--tinta); background: var(--tinta); color: #fff; font: inherit; cursor: pointer; }
+  a { color: var(--liberado); }
+  .legenda { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--tinta-2); align-items: center; }
+  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .resumo { position: absolute; left: 16px; bottom: 14px; font-size: 12px; color: var(--tinta-2); background: rgba(251,250,247,.9);
+            padding: 8px 12px; border-radius: 6px; border: 1px solid var(--linha); }
+  .resumo b { color: var(--tinta); font-weight: 600; }
+  .vazio { color: var(--tinta-2); font-size: 13px; }
+  .msg { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--tinta); color: #fff;
+         padding: 8px 14px; border-radius: 6px; font-size: 12px; display: none; z-index: 10; }
+  .tela { display: grid; place-items: center; height: 100vh; text-align: center; padding: 24px; color: var(--tinta-2); }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 55vh auto; height: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--linha); }
+    .busca { margin-left: 0; width: 100%; } .busca input { width: 100%; } .resultados { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div id="tela" class="tela">Carregando as pastas…</div>
+<div id="app" class="app" style="display:none">
+  <header>
+    <div>
+      <h1>Pastas do Drive do ÉPURA · decisão de publicação</h1>
+      <div class="sub">Clique numa pasta para ver o conteúdo e decidir. A decisão vale para as subpastas, até alguém decidir diferente nelas.</div>
+    </div>
+    <div class="legenda" aria-label="Legenda">
+      <span><i class="sw" style="background:var(--liberado)"></i>Liberado</span>
+      <span><i class="sw" style="background:var(--interno)"></i>Interno</span>
+      <span><i class="sw" style="background:#fff;border:1.5px dashed var(--nao)"></i>Não incorporar</span>
+      <span><i class="sw" style="background:var(--interno);opacity:.35"></i>cor clara = herdada</span>
+      <span><i class="sw" style="background:#fff;border:2px solid var(--sensivel)"></i>tem arquivos pessoais</span>
+      <span>tamanho = nº de arquivos</span>
+    </div>
+    <div class="busca">
+      <input id="busca" type="search" placeholder="Procurar pasta…" autocomplete="off">
+      <div id="resultados" class="resultados"></div>
+    </div>
+  </header>
+  <main>
+    <svg id="grafo" role="img" aria-label="Árvore radial das pastas do Drive"></svg>
+    <div id="resumo" class="resumo"></div>
+  </main>
+  <aside id="painel"><p class="vazio">Escolha uma pasta no gráfico ou pela busca.</p></aside>
+</div>
+<div id="msg" class="msg"></div>
+
+<script>
+const ROTULOS = { liberado: 'Liberado', interno: 'Interno', nao_incorporar: 'Não incorporar' };
+const COR = { liberado: '#4f9e98', interno: '#b3ab9b', nao_incorporar: '#a3324f' };
+let raiz, porId = {}, selecionado = null, quem = '';
+// A chave pessoal vem do endereço (?k=…). O script do Google é chamado sem cookies,
+// para não depender de qual conta Google está aberta no navegador.
+const API = 'https://script.google.com/macros/s/AKfycbzFppJZh4JO-VMg4hkqiYCqijiD-oVPXUzzqiEEsyJEYa7A-gW_n848MmPKzBtrNERi/exec';
+const chave = new URLSearchParams(location.search).get('k') || '';
+function chamar(metodo, corpo) {
+  const opcoes = { method: metodo, credentials: 'omit', redirect: 'follow' };
+  let url = API;
+  if (metodo === 'GET') url += '?' + new URLSearchParams(corpo);
+  else { opcoes.headers = { 'Content-Type': 'text/plain;charset=utf-8' }; opcoes.body = JSON.stringify(corpo); }
+  return fetch(url, opcoes)
+    .then(r => { if (!r.ok) throw new Error('o servidor respondeu ' + r.status); return r.json(); })
+    .then(d => { if (d && d.erro) throw new Error(d.erro); return d; });
+}
+
+// ---------- carregamento com etapa e tempo visíveis ----------
+const T0 = Date.now();
+let etapa = 'abrindo a página';
+const telaEl = document.getElementById('tela');
+const relogioCarga = setInterval(() => {
+  const s = Math.round((Date.now() - T0) / 1000);
+  telaEl.textContent = 'Carregando as pastas… ' + etapa + ' (' + s + ' s)' +
+    (s >= 25 ? '. Está demorando mais que o normal; se passar de 60 s, recarregue a página.' : '');
+}, 1000);
+window.addEventListener('error', e => {
+  clearInterval(relogioCarga);
+  telaEl.textContent = 'Erro ao montar a página (' + etapa + '): ' + (e.message || e.type) +
+    (typeof d3 === 'undefined' ? '. A biblioteca de desenho (d3) não carregou; verifique a internet ou recarregue.' : '');
+});
+
+// ---------- dados ----------
+function carregar() {
+  if (typeof d3 === 'undefined') { etapa = 'baixando a biblioteca de desenho'; return setTimeout(carregar, 300); }
+  if (!window.DADOS_TESTE) {
+    etapa = 'lendo a planilha do Catálogo';
+    chamar('GET', { acao: 'dados', k: chave }).then(iniciar, erroInicial);
+  } else if (window.DADOS_TESTE) {
+    iniciar(window.DADOS_TESTE);   // pré-visualização local
+  } else {
+    erroInicial({ message: 'sem dados' });
+  }
+}
+function erroInicial(e) {
+  clearInterval(relogioCarga);
+  const m = String(e && e.message || e);
+  document.getElementById('tela').textContent = m.includes('SEM_CHAVE')
+    ? 'Este link não abre o visualizador. Use o link pessoal que o grupo enviou para você, ou peça um novo a Arthur.'
+    : m.includes('SEM_ACESSO')
+    ? 'A página não conseguiu abrir a planilha do Catálogo. Avise Arthur.'
+    : m.includes('SEM_REVISAO')
+      ? 'A aba "Revisão de pastas" ainda não existe. Rode recalcular() no projeto do Catálogo.'
+      : 'Não foi possível carregar: ' + m;
+}
+function salvar(no, campo, valor) {
+  const antes = no.data[campo];
+  no.data[campo] = valor;
+  atualizarTudo();
+  const ok = () => aviso('Salvo.');
+  const falha = e => { no.data[campo] = antes; atualizarTudo(); aviso('Não salvou: ' + (e && e.message || e)); };
+  if (!window.DADOS_TESTE)
+    chamar('POST', { k: chave, pasta: no.data.id, campo, valor }).then(ok, falha);
+  else ok();
+}
+function aviso(t) {
+  const m = document.getElementById('msg'); m.textContent = t; m.style.display = 'block';
+  clearTimeout(aviso._t); aviso._t = setTimeout(() => m.style.display = 'none', 2200);
+}
+
+function iniciar(d) {
+  etapa = 'desenhando a árvore';
+  quem = d.quem || '';
+  const msServidor = d.ms_servidor;
+  const c = n => d.cab.indexOf(n);
+  const itens = d.linhas.map(r => ({
+    id: r[c('pasta_id')], pai: r[c('pai')], caminho: r[c('caminho')], nome: r[c('caminho')].split('/').pop(),
+    arquivos: +r[c('arquivos')] || 0, documentos: +r[c('documentos')] || 0, imagens: +r[c('imagens')] || 0,
+    gis: +r[c('gis')] || 0, mb: +r[c('tamanho_mb')] || 0, modificado: r[c('modificado')], projeto: r[c('projeto_mais_comum')],
+    sensiveis: +r[c('sensiveis')] || 0, link: r[c('link')],
+    decisao: r[c('decisao')] || '', apagar: r[c('apagar')] || '', observacao: r[c('observacao')] || ''
+  }));
+  const ids = new Set(itens.map(i => i.id));
+  const topo = { id: '__raiz', pai: null, nome: 'Drive do ÉPURA', caminho: '', arquivos: 0, decisao: '' };
+  itens.forEach(i => { if (!i.pai || !ids.has(i.pai)) i.pai = '__raiz'; });
+  topo.arquivos = itens.filter(i => i.pai === '__raiz').reduce((s, i) => s + i.arquivos, 0);
+  raiz = d3.stratify().id(i => i.id).parentId(i => i.pai)([topo].concat(itens));
+  raiz.sort((a, b) => b.data.arquivos - a.data.arquivos);
+  raiz.each(n => { porId[n.data.id] = n; n._filhos = n.children; });
+  // começa mostrando dois níveis abaixo das raízes
+  raiz.each(n => { n.children = n._filhos && n.depth < 2 ? visiveis(n) : null; });
+  clearInterval(relogioCarga);
+  document.getElementById('tela').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  montarSvg();
+  atualizarTudo();
+  // tempo de carga no rodapé do painel, para diagnóstico
+  const total = ((Date.now() - T0) / 1000).toFixed(1).replace('.', ',');
+  const srv = msServidor != null ? ' (planilha: ' + (msServidor / 1000).toFixed(1).replace('.', ',') + ' s)' : '';
+  document.getElementById('painel').insertAdjacentHTML('beforeend', '<p class="estado">Carregou em ' + total + ' s' + srv + '.</p>');
+}
+
+// Até MAX subpastas por pasta (as maiores); o resto vira um nó "+N pastas menores", que abre ao clicar.
+const MAX = 20;
+function visiveis(n) {
+  const f = n._filhos || [];
+  if (n._todos || f.length <= MAX) return f.slice();
+  const resto = f.slice(MAX - 1);
+  const s = d3.hierarchy({ id: n.data.id + '__mais', nome: '+' + resto.length + ' pastas menores',
+                           caminho: n.data.caminho, arquivos: resto.reduce((t, x) => t + x.data.arquivos, 0), sintetico: true });
+  s.parent = n; s.depth = n.depth + 1; s.children = undefined;
+  return f.slice(0, MAX - 1).concat([s]);
+}
+
+// ---------- decisão efetiva (herança) ----------
+function efetiva(n) {
+  for (let p = n; p; p = p.parent) if (p.data.decisao) return { valor: p.data.decisao, de: p === n ? null : p };
+  return { valor: 'interno', de: null, padrao: true };
+}
+
+// ---------- desenho ----------
+let svg, g, zoom;
+function montarSvg() {
+  svg = d3.select('#grafo');
+  g = svg.append('g');
+  g.append('g').attr('class', 'links');
+  g.append('g').attr('class', 'nos');
+  zoom = d3.zoom().scaleExtent([0.2, 8]).on('zoom', e => g.attr('transform', e.transform));
+  svg.call(zoom);
+  enquadrar(false);
+}
+const ANEL = 130;   // distância entre níveis da árvore, em px
+function alturaVisivel() { let h = 0; raiz.each(n => { if (n.depth > h) h = n.depth; }); return h; }
+function enquadrar(animado) {
+  const b = svg.node().getBoundingClientRect(), R = alturaVisivel() * ANEL + 140;
+  const t = d3.zoomIdentity.translate(b.width / 2, b.height / 2).scale(Math.min(1.2, Math.min(b.width, b.height) / (2 * R)));
+  (animado ? svg.transition().duration(500) : svg).call(zoom.transform, t);
+}
+const raio = n => n.depth === 0 ? 6 : Math.min(24, 2.5 + Math.sqrt(n.data.arquivos) * 0.32);
+
+function atualizarTudo() { desenhar(); resumo(); if (selecionado) painel(selecionado); }
+
+function desenhar() {
+  const R = Math.max(1, alturaVisivel()) * ANEL;
+  const arvore = d3.tree().size([2 * Math.PI, R]).separation((a, c) => (a.parent === c.parent ? 1 : 2) / Math.max(1, a.depth));
+  arvore(raiz);
+  const ponto = n => [n.y * Math.cos(n.x - Math.PI / 2), n.y * Math.sin(n.x - Math.PI / 2)];
+
+  const links = g.select('.links').selectAll('path').data(raiz.links(), l => l.target.data.id);
+  links.exit().remove();
+  links.enter().append('path').attr('class', 'link').merge(links)
+    .attr('d', d3.linkRadial().angle(n => n.x).radius(n => n.y))
+    .attr('stroke-opacity', l => efetiva(l.target).valor === 'nao_incorporar' ? 0.35 : 1);
+
+  const nos = g.select('.nos').selectAll('g.no').data(raiz.descendants(), n => n.data.id);
+  nos.exit().remove();
+  const novo = nos.enter().append('g').attr('class', 'no');
+  novo.append('circle').attr('class', 'sens');
+  novo.append('circle').attr('class', 'corpo')
+    .on('click', (e, n) => { e.stopPropagation(); clicar(n); })
+    .append('title');
+  novo.append('text');
+  const todos = novo.merge(nos);
+  todos.attr('transform', n => 'translate(' + ponto(n) + ')');
+  todos.select('circle.sens')
+    .attr('r', n => raio(n) + 2.5).attr('fill', 'none')
+    .attr('stroke', n => n.data.sensiveis ? '#f07c6e' : 'none').attr('stroke-width', 1.5);
+  todos.select('circle.corpo')
+    .attr('r', raio)
+    .attr('fill', n => { const e = efetiva(n); return n.depth === 0 ? '#2b2a27' : e.valor === 'nao_incorporar' ? '#fff' : COR[e.valor]; })
+    .attr('fill-opacity', n => { const e = efetiva(n); return n.depth === 0 ? 1 : e.valor === 'nao_incorporar' ? 0.6 : (n.data.decisao ? 0.9 : 0.35); })
+    .attr('stroke', n => { const e = efetiva(n); return n === selecionado ? '#2b2a27' : e.valor === 'nao_incorporar' ? '#a3324f' : n.data.decisao ? d3.color(COR[e.valor]).darker(0.6) : 'none'; })
+    .attr('stroke-width', n => n === selecionado ? 2.5 : 1.2)
+    .attr('stroke-dasharray', n => efetiva(n).valor === 'nao_incorporar' ? '3 2' : null)
+    .select('title').text(n => n.data.nome + ' · ' + n.data.arquivos.toLocaleString('pt-BR') + ' arquivos' +
+                              (n._filhos && !n.children ? ' · clique para abrir' : ''));
+  todos.select('text')
+    .attr('class', n => 'rotulo' + (n.depth <= 1 ? ' forte' : ''))
+    .attr('dy', '0.32em')
+    .attr('x', n => (n.x < Math.PI ? 1 : -1) * (raio(n) + 4))
+    .attr('text-anchor', n => n.x < Math.PI ? 'start' : 'end')
+    .attr('transform', n => n.depth === 0 ? null : 'rotate(' + ((n.x * 180 / Math.PI - 90) + (n.x < Math.PI ? 0 : 180)) + ')')
+    .text(n => (n.depth <= 1 || n.data.arquivos >= 150 || n === selecionado) ? corta(n.data.nome, 28) : '');
+}
+const corta = (s, k) => s.length > k ? s.slice(0, k - 1) + '…' : s;
+
+function clicar(n) {
+  if (n.data.sintetico) {        // "+N pastas menores": mostra todas as subpastas do pai
+    n.parent._todos = true; n.parent.children = visiveis(n.parent);
+    selecionado = n.parent; atualizarTudo(); return;
+  }
+  if (n._filhos) n.children = n.children ? (n === selecionado ? null : n.children) : visiveis(n);
+  selecionado = n;
+  atualizarTudo();
+}
+
+// ---------- painel ----------
+function painel(n) {
+  const d = n.data, e = efetiva(n), el = document.getElementById('painel');
+  if (n.depth === 0) { el.innerHTML = '<p class="vazio">Escolha uma pasta.</p>'; return; }
+  const num = v => Number(v).toLocaleString('pt-BR');
+  const origem = d.decisao ? 'Decisão desta pasta.' : e.de ? 'Herdada de “' + esc(e.de.data.nome) + '”.' : 'Sem decisão: fica como interno.';
+  el.innerHTML = `
+    <h2>${esc(d.nome)}</h2>
+    <div class="caminho">${esc(d.caminho)}</div>
+    <dl class="numeros">
+      <div><dt>Arquivos</dt><dd>${num(d.arquivos)}</dd></div>
+      <div><dt>Documentos</dt><dd>${num(d.documentos)}</dd></div>
+      <div><dt>Imagens</dt><dd>${num(d.imagens)}</dd></div>
+      <div><dt>GIS</dt><dd>${num(d.gis)}</dd></div>
+      <div><dt>Tamanho</dt><dd>${d.mb >= 1024 ? (d.mb / 1024).toFixed(1).replace('.', ',') + ' GB' : num(d.mb) + ' MB'}</dd></div>
+      <div><dt>Última mudança</dt><dd>${esc(d.modificado || '—')}</dd></div>
+      <div style="grid-column:1/-1"><dt>Projeto sugerido</dt><dd>${esc(d.projeto || '—')}</dd></div>
+    </dl>
+    ${d.sensiveis ? `<div class="aviso">${num(d.sensiveis)} arquivo(s) parecem pessoais (atestado, currículo, formulário). Eles ficam fora do site mesmo se a pasta for liberada.</div>` : ''}
+    <div class="rot">Decisão</div>
+    <div class="botoes">
+      ${['liberado', 'interno', 'nao_incorporar'].map(v => `
+        <button data-v="${v}" class="${e.valor === v ? 'ativo' : ''}">
+          <span class="amostra" style="${v === 'nao_incorporar' ? 'border:1.5px dashed #a3324f;background:#fff' : 'background:' + COR[v]}"></span>
+          <span>${ROTULOS[v]}<small>${{ liberado: 'vai para o site do grupo', interno: 'fica no grafo e no Obsidian, só para o grupo', nao_incorporar: 'sai do grafo e do Obsidian; continua no Drive' }[v]}</small></span>
+        </button>`).join('')}
+    </div>
+    <div class="estado">${origem} ${d.decisao ? '<button class="limpar" id="herdar">voltar a herdar</button>' : ''}</div>
+    <div class="rot">Drive</div>
+    <label class="chk"><input type="checkbox" id="apagar" ${d.apagar === 'sim' ? 'checked' : ''}> Sugerir apagar esta pasta do Drive</label>
+    <div class="estado">Nada é apagado automaticamente; a sugestão vai para uma lista.</div>
+    <div class="rot">Observação</div>
+    <textarea id="obs" maxlength="500" placeholder="Opcional">${esc(d.observacao)}</textarea>
+    <div class="acoes"><button id="salvarObs">Salvar observação</button>${d.link ? `<a href="${esc(d.link)}" target="_blank" rel="noopener">Abrir no Drive</a>` : ''}</div>
+    ${quem ? `<div class="estado" style="margin-top:18px">Decisões registradas como ${esc(quem)}.</div>` : ''}`;
+  el.querySelectorAll('.botoes button').forEach(b => b.onclick = () => salvar(n, 'decisao', b.dataset.v));
+  const h = el.querySelector('#herdar'); if (h) h.onclick = () => salvar(n, 'decisao', '');
+  el.querySelector('#apagar').onchange = ev => salvar(n, 'apagar', ev.target.checked ? 'sim' : '');
+  el.querySelector('#salvarObs').onclick = () => salvar(n, 'observacao', el.querySelector('#obs').value);
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ---------- resumo: arquivos por decisão (cada arquivo contado uma vez) ----------
+function resumo() {
+  const soma = { liberado: 0, interno: 0, nao_incorporar: 0 }, pastas = { liberado: 0, interno: 0, nao_incorporar: 0 };
+  // percorre a árvore inteira (_filhos), não só as pastas abertas no desenho
+  const pilha = [raiz];
+  while (pilha.length) {
+    const n = pilha.pop();
+    (n._filhos || []).forEach(f => pilha.push(f));
+    if (n.depth === 0) continue;
+    const proprios = n.data.arquivos - (n._filhos || []).reduce((s, f) => s + f.data.arquivos, 0);
+    const v = efetiva(n).valor;
+    soma[v] += Math.max(0, proprios); pastas[v]++;
+  }
+  const num = v => v.toLocaleString('pt-BR');
+  document.getElementById('resumo').innerHTML = Object.keys(soma).map(k =>
+    `<span style="color:${COR[k]}">●</span> ${ROTULOS[k]}: <b>${num(soma[k])}</b> arquivos em ${num(pastas[k])} pastas`).join(' &nbsp;·&nbsp; ');
+}
+
+// ---------- busca ----------
+const busca = document.getElementById('busca'), res = document.getElementById('resultados');
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+busca.addEventListener('input', () => {
+  const q = norm(busca.value.trim());
+  if (q.length < 2) { res.style.display = 'none'; return; }
+  const achados = Object.values(porId).filter(n => n.depth > 0 && norm(n.data.caminho).includes(q)).slice(0, 30);
+  res.innerHTML = achados.map(n => `<div data-id="${esc(n.data.id)}">${esc(n.data.caminho)} <span style="color:#6f6a60">· ${n.data.arquivos.toLocaleString('pt-BR')}</span></div>`).join('') || '<div>Nada encontrado</div>';
+  res.style.display = 'block';
+});
+res.addEventListener('click', ev => {
+  const id = ev.target.closest('[data-id]') && ev.target.closest('[data-id]').dataset.id;
+  if (!id) return;
+  const n = porId[id];
+  // abre o caminho da raiz até a pasta; se ela estiver entre as "menores", mostra todas as irmãs
+  for (let c = n, p = n.parent; p; c = p, p = p.parent) {
+    if (!p._filhos.slice(0, MAX - 1).includes(c) && p._filhos.length > MAX) p._todos = true;
+    p.children = visiveis(p);
+  }
+  selecionado = n; res.style.display = 'none'; busca.value = '';
+  atualizarTudo();
+  const b = svg.node().getBoundingClientRect();
+  const [x, y] = [n.y * Math.cos(n.x - Math.PI / 2), n.y * Math.sin(n.x - Math.PI / 2)];
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(b.width / 2 - x * 1.6, b.height / 2 - y * 1.6).scale(1.6));
+});
+window.addEventListener('resize', () => raiz && desenhar());
+
+carregar();
+</script>
+</body>
+</html>
