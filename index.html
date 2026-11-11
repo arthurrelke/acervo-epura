@@ -6,388 +6,677 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <title>Visualizador do Acervo ÉPURA</title>
-<base target="_blank">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
   :root {
-    --papel: #f3f1ec; --painel: #fbfaf7; --tinta: #2b2a27; --tinta-2: #6f6a60; --linha: #d8d2c6; --linha-forte: #c9c4b8;
-    --liberado: #4f9e98; --interno: #b3ab9b; --nao: #a3324f; --sensivel: #f07c6e; --foco: #2b2a27;
+    --papel: #f3f1ec; --painel: #fbfaf7; --branco: #ffffff;
+    --tinta: #2b2a27; --tinta-2: #5c574e; --linha: #d8d2c6; --linha-forte: #b9b2a4;
+    /* estados: a cor só reforça; o texto sempre diz o estado (R8) */
+    --site: #4f9e98; --site-texto: #2c6b66; --site-fundo: #e3f0ec;
+    --grupo: #8f877a; --grupo-fundo: #ebe7df;
+    --fora: #a3324f; --fora-fundo: #f6e3e7;
+    --aberto: #e4dfd5;
+    --falta: #b0412f; --falta-fundo: #fbe9e4;
+    --lente: #2c6b66;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--papel); color: var(--tinta);
-               font: 14px/1.45 Inter, system-ui, sans-serif; }
-  .app { display: grid; grid-template-columns: 1fr 360px; grid-template-rows: auto 1fr; height: 100vh; }
-  header { grid-column: 1 / -1; display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
-           padding: 14px 20px; border-bottom: 1px solid var(--linha); }
-  h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; margin: 0; }
-  .sub { color: var(--tinta-2); font-size: 12px; }
-  .busca { margin-left: auto; position: relative; }
-  .busca input { width: 260px; padding: 7px 10px; border: 1px solid var(--linha-forte); border-radius: 6px;
-                 background: var(--painel); font: inherit; }
-  .resultados { position: absolute; right: 0; top: 36px; width: 360px; max-height: 320px; overflow: auto; z-index: 5;
-                background: var(--painel); border: 1px solid var(--linha-forte); border-radius: 6px; display: none; }
-  .resultados div { padding: 6px 10px; cursor: pointer; font-size: 12px; border-bottom: 1px solid var(--linha); }
-  .resultados div:hover { background: var(--papel); }
-  main { position: relative; overflow: hidden; }
-  svg { width: 100%; height: 100%; display: block; cursor: grab; }
-  .link { fill: none; stroke: var(--linha); stroke-width: .8; }
-  .no circle { cursor: pointer; }
-  .rotulo { font-size: 10px; fill: var(--tinta-2); pointer-events: none; paint-order: stroke; stroke: var(--papel); stroke-width: 3px; }
-  .rotulo.forte { font-size: 11px; fill: var(--tinta); font-weight: 500; }
-  aside { border-left: 1px solid var(--linha); background: var(--painel); overflow: auto; padding: 18px 20px; }
-  aside h2 { font-size: 15px; margin: 0 0 4px; word-break: break-word; }
-  .caminho { color: var(--tinta-2); font-size: 12px; word-break: break-word; margin-bottom: 14px; }
-  .numeros { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 0 0 16px; }
-  .numeros dt { color: var(--tinta-2); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-  .numeros dd { margin: 0 0 6px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .aviso { border-left: 3px solid var(--sensivel); padding: 6px 10px; background: #fdf0ed; font-size: 12px; margin-bottom: 14px; }
-  .rot { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta-2); margin: 14px 0 6px; }
-  .botoes { display: grid; gap: 8px; }
-  .botoes button { text-align: left; padding: 10px 12px; border-radius: 8px; border: 1.5px solid var(--linha-forte);
-                   background: #fff; font: inherit; cursor: pointer; display: flex; gap: 10px; align-items: center; }
-  .botoes button .amostra { width: 14px; height: 14px; border-radius: 50%; flex: none; }
-  .botoes button small { display: block; color: var(--tinta-2); font-size: 11px; }
-  .botoes button.ativo { border-color: var(--tinta); box-shadow: 0 0 0 1px var(--tinta) inset; }
-  .estado { font-size: 12px; color: var(--tinta-2); margin-top: 8px; }
-  .limpar { background: none; border: 0; color: var(--tinta-2); text-decoration: underline; cursor: pointer; padding: 0; font: inherit; font-size: 12px; }
-  label.chk { display: flex; gap: 8px; align-items: center; margin-top: 6px; cursor: pointer; }
-  textarea { width: 100%; min-height: 64px; border: 1px solid var(--linha-forte); border-radius: 6px; padding: 8px; font: inherit; background: #fff; }
-  .acoes { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
-  .acoes button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--tinta); background: var(--tinta); color: #fff; font: inherit; cursor: pointer; }
-  a { color: var(--liberado); }
-  .legenda { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--tinta-2); align-items: center; }
-  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
-  .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-  .resumo { position: absolute; left: 16px; bottom: 14px; font-size: 12px; color: var(--tinta-2); background: rgba(251,250,247,.9);
-            padding: 8px 12px; border-radius: 6px; border: 1px solid var(--linha); }
-  .resumo b { color: var(--tinta); font-weight: 600; }
-  .vazio { color: var(--tinta-2); font-size: 13px; }
-  .msg { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--tinta); color: #fff;
-         padding: 8px 14px; border-radius: 6px; font-size: 12px; display: none; z-index: 10; }
-  .tela { display: grid; place-items: center; height: 100vh; text-align: center; padding: 24px; color: var(--tinta-2); }
-  @media (max-width: 860px) {
-    .app { grid-template-columns: 1fr; grid-template-rows: auto 55vh auto; height: auto; }
-    aside { border-left: 0; border-top: 1px solid var(--linha); }
-    .busca { margin-left: 0; width: 100%; } .busca input { width: 100%; } .resultados { width: 100%; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--papel); color: var(--tinta); font: 16px/1.5 Inter, system-ui, sans-serif; }
+  .pagina { max-width: 980px; margin: 0 auto; padding: 20px 16px 120px; }
+  h1 { font-size: 22px; line-height: 1.25; margin: 0 0 4px; font-weight: 600; }
+  h2 { font-size: 20px; line-height: 1.3; margin: 0 0 4px; font-weight: 600; }
+  h3 { font-size: 17px; line-height: 1.35; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .rotulo { font-size: 14px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-2); margin: 28px 0 8px; }
+  .sec { font-size: 14px; color: var(--tinta-2); }
+  p { margin: 0 0 8px; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .bt { min-height: 44px; min-width: 44px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--linha-forte);
+        background: var(--branco); display: inline-flex; align-items: center; gap: 8px; text-align: left; }
+  .bt:hover { border-color: var(--tinta); }
+  .bt:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+  .bt.escuro { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+  .bt.texto { border-color: transparent; background: transparent; text-decoration: underline; padding: 10px 8px; }
+  a.bt { color: var(--tinta); text-decoration: none; }
+  .linha-bts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+  /* carregamento (R10) */
+  .esqueleto { padding: 40px 16px; max-width: 980px; margin: 0 auto; }
+  .esqueleto .barra { height: 18px; border-radius: 6px; background: #e6e1d7; margin: 12px 0; }
+
+  /* topo e progresso */
+  header { border-bottom: 1px solid var(--linha); padding-bottom: 16px; margin-bottom: 8px; }
+  .progresso { background: var(--painel); border: 1px solid var(--linha); border-radius: 10px; padding: 14px 16px; margin-top: 16px; }
+  .progresso .numeros { font-size: 17px; font-weight: 500; }
+  .pilha { display: flex; height: 16px; border-radius: 4px; overflow: hidden; margin: 12px 0 10px; background: var(--aberto); border: 1px solid var(--linha); }
+  .pilha span { display: block; height: 100%; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .legenda span { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--tinta-2); }
+  .amostra-cor { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.15); }
+
+  /* busca e lentes */
+  .ferramentas { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+  .campo { display: grid; gap: 4px; }
+  .campo label { font-size: 14px; color: var(--tinta-2); }
+  .campo input, .campo select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--linha-forte); border-radius: 8px; background: var(--branco); width: 100%; }
+  .lentes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .resultados { display: grid; gap: 6px; margin-top: 8px; }
+  .resultados .bt { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .aviso-lente { font-size: 14px; color: var(--lente); margin-top: 8px; }
+
+  /* árvore recuada (Lattes) */
+  ul.arvore { list-style: none; margin: 0; padding: 0; }
+  ul.arvore ul { list-style: none; margin: 0 0 0 21px; padding: 0 0 0 12px; border-left: 1px solid var(--linha-forte); }
+  .no { display: grid; grid-template-columns: 44px 1fr; align-items: start; gap: 4px; padding: 2px 0; }
+  .no .abrir { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 8px; font-size: 16px; color: var(--tinta-2); }
+  .no .abrir:hover { background: var(--aberto); }
+  .no .sem-filhos { width: 44px; height: 44px; }
+  .no .corpo { min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent;
+               text-align: left; width: 100%; display: grid; gap: 2px; }
+  .no .corpo:hover { background: var(--painel); border-color: var(--linha); }
+  .no .titulo { font-weight: 500; overflow-wrap: anywhere; }
+  .no .meta { font-size: 14px; color: var(--tinta-2); display: flex; flex-wrap: wrap; gap: 2px 12px; }
+  .no.fora-lente .titulo { color: var(--tinta-2); font-weight: 400; }
+  .no.na-lente .corpo { border-color: var(--lente); background: var(--site-fundo); }
+  .ver-todos { margin: 4px 0 8px 48px; }
+  .estado { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+  .estado .amostra-cor { width: 12px; height: 12px; }
+  .tag-falta { font-size: 14px; color: var(--falta); font-weight: 500; }
+  .em-aberto { margin-top: 12px; border-top: 1px dashed var(--linha-forte); padding-top: 8px; }
+
+  /* material que falta */
+  .faltas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .faltas .bt { flex-direction: column; align-items: flex-start; gap: 0; }
+  .faltas .bt b { font-size: 20px; font-weight: 600; }
+  .faltas .bt.ativo { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+  .lista-pedidos { display: grid; gap: 8px; margin-top: 10px; }
+
+  /* tela do assunto */
+  .caminho-galho { font-size: 14px; color: var(--tinta-2); margin: 8px 0 12px; overflow-wrap: anywhere; }
+  .decisao-grande { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .decisao-grande .bt { flex-direction: column; align-items: flex-start; min-height: 64px; gap: 2px; }
+  .decisao-grande .bt small, .botoes-pasta .bt small { font-size: 14px; color: var(--tinta-2); }
+  .bt.ativo[data-v="liberado"] { border-color: var(--site); background: var(--site-fundo); box-shadow: inset 0 0 0 1px var(--site); }
+  .bt.ativo[data-v="interno"] { border-color: var(--grupo); background: var(--grupo-fundo); box-shadow: inset 0 0 0 1px var(--grupo); }
+  .bt.ativo[data-v="nao_incorporar"] { border-color: var(--fora); background: var(--fora-fundo); box-shadow: inset 0 0 0 1px var(--fora); }
+  .cartao { background: var(--painel); border: 1px solid var(--linha); border-radius: 10px; padding: 14px 16px; margin-top: 10px; }
+  .cartao.foco { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+  .cartao .onde { font-size: 14px; color: var(--tinta-2); overflow-wrap: anywhere; }
+  .cartao .amostra { font-size: 14px; color: var(--tinta-2); overflow-wrap: anywhere; margin-top: 4px; }
+  .pessoais { border-left: 4px solid var(--falta); background: var(--falta-fundo); padding: 8px 12px; margin-top: 8px; font-size: 14px; }
+  .botoes-pasta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .acoes { border-top: 1px solid var(--linha); margin-top: 12px; padding-top: 4px; gap: 0 4px; }
+  .bt.leve { border-color: transparent; background: transparent; text-decoration: underline; text-underline-offset: 3px; padding: 10px 8px; }
+  .bt.leve:hover { background: var(--aberto); }
+  .segue { font-size: 14px; margin-top: 8px; }
+  .pedido .bts-pedido { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pedido .bt.ativo { border-color: var(--tinta); background: var(--aberto); box-shadow: inset 0 0 0 1px var(--tinta); }
+  .ligar { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--linha); }
+
+  /* barra de retorno (R9) */
+  /* faixa opaca de largura inteira no rodapé: cobre o conteúdo, não fica por cima de texto solto */
+  .barra-salvo { position: fixed; left: 0; right: 0; bottom: 0; background: var(--tinta); color: #fff;
+                 padding: 8px max(16px, calc((100% - 980px) / 2 + 16px)); display: none; align-items: center;
+                 justify-content: space-between; gap: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.15); }
+  .barra-salvo .bt { background: transparent; border-color: #fff; color: #fff; }
+  .barra-salvo.erro { background: var(--fora); }
+  footer { margin-top: 40px; font-size: 14px; color: var(--tinta-2); }
+
+  @media (min-width: 700px) {
+    .pagina { padding: 28px 24px 120px; }
+    .ferramentas { grid-template-columns: 1.3fr 1fr; align-items: end; }
+    h1 { font-size: 26px; }
+  }
+  @media (max-width: 600px) {
+    ul.arvore ul { margin-left: 12px; padding-left: 6px; }
+    .no { grid-template-columns: 44px 1fr; gap: 0; }
+    .decisao-grande { grid-template-columns: 1fr; }
+    .lentes { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
-<div id="tela" class="tela">Carregando as pastas…</div>
-<div id="app" class="app" style="display:none">
-  <header>
-    <div>
-      <h1>Pastas do Drive do ÉPURA · decisão de publicação</h1>
-      <div class="sub">Clique numa pasta para ver o conteúdo e decidir. A decisão vale para as subpastas, até alguém decidir diferente nelas.</div>
-    </div>
-    <div class="legenda" aria-label="Legenda">
-      <span><i class="sw" style="background:var(--liberado)"></i>Liberado</span>
-      <span><i class="sw" style="background:var(--interno)"></i>Interno</span>
-      <span><i class="sw" style="background:#fff;border:1.5px dashed var(--nao)"></i>Não incorporar</span>
-      <span><i class="sw" style="background:var(--interno);opacity:.35"></i>cor clara = herdada</span>
-      <span><i class="sw" style="background:#fff;border:2px solid var(--sensivel)"></i>tem arquivos pessoais</span>
-      <span>tamanho = nº de arquivos</span>
-    </div>
-    <div class="busca">
-      <input id="busca" type="search" placeholder="Procurar pasta…" autocomplete="off">
-      <div id="resultados" class="resultados"></div>
-    </div>
-  </header>
-  <main>
-    <svg id="grafo" role="img" aria-label="Árvore radial das pastas do Drive"></svg>
-    <div id="resumo" class="resumo"></div>
-  </main>
-  <aside id="painel"><p class="vazio">Escolha uma pasta no gráfico ou pela busca.</p></aside>
+<div id="carregando" class="esqueleto" aria-live="polite">
+  <p id="etapa">Carregando o acervo…</p>
+  <div class="barra" style="width:70%"></div><div class="barra" style="width:45%"></div><div class="barra" style="width:60%"></div>
 </div>
-<div id="msg" class="msg"></div>
+<div id="app" class="pagina" hidden></div>
+<div id="barra" class="barra-salvo" role="status" aria-live="polite"><span id="barra-texto"></span><button id="desfazer" class="bt" type="button">Desfazer</button></div>
 
 <script>
-const ROTULOS = { liberado: 'Liberado', interno: 'Interno', nao_incorporar: 'Não incorporar' };
-const COR = { liberado: '#4f9e98', interno: '#b3ab9b', nao_incorporar: '#a3324f' };
-let raiz, porId = {}, selecionado = null, quem = '';
-// A chave pessoal vem do endereço (?k=…). O script do Google é chamado sem cookies,
-// para não depender de qual conta Google está aberta no navegador.
+// ---------- vocabulário da tela (R4: só palavras dela) ----------
+const ROTULO = { liberado: 'Pode ir para o site', interno: 'Só para o grupo', nao_incorporar: 'Deixado de fora' };
+const BOTAO = { liberado: 'Pode ir para o site', interno: 'Só para o grupo', nao_incorporar: 'Deixar de fora' };
+const EXPLICA = { liberado: 'aparece no site do grupo', interno: 'fica só no acervo do grupo', nao_incorporar: 'some do acervo; continua no Drive' };
+const COR = { liberado: 'var(--site)', interno: 'var(--grupo)', nao_incorporar: 'var(--fora)', aberto: 'var(--aberto)' };
+const PEDIDO = { a_pedir: 'Falta o arquivo', pedido: 'Já pedimos', recebido: 'Recebido', nao_existe: 'Não existe mais', conferir: 'Conferir' };
+const PESO = { nao_incorporar: 3, interno: 2, liberado: 1 };
+const LINHAS = { EL: 'Espaços livres', PT: 'Políticas territoriais em Mato Grosso', PU: 'Paisagem urbana', UM: 'Urbanização e urbanismo em Mato Grosso' };
+const GALHOS = ['galho', 'programa', 'quadrante'];
+const RAIZ = 'grupo-epura', EM_ABERTO = 'ramo-em-aberto', MAX = 7;
+// pedidos cujo id não é "ped-" + assunto
+const PEDIDO_ASSUNTO = { 'ped-proj-transformacoes-mt': 'proj-amazonicidades', 'ped-proj-centro-historico': 'proj-centro-historico-gestao',
+  'ped-proj-amigos-cidade': 'proj-amigos-da-cidade', 'ped-proj-defesa-cidades': 'proj-defesa-das-cidades',
+  'ped-proj-oficina-luos': 'acao-oficina-luos', 'ped-proj-transver': 'proj-enepea-2022', 'ped-proj-parques-brasil': 'proj-parques-urbanos',
+  'ped-premio-rosa-kliass-santos': 'evento-premio-rosa-kliass', 'ped-dropbox-tfg-epura': 'orient-tfg',
+  'ped-cadastro-amanda-2026': 'tfg-2026-mendes', 'ped-cadastro-yohanna-2026': 'tfg-2026-berti',
+  'ped-cadastro-renata-2024': 'tfg-2024-rodrigues-oliveira' };
+
+// ---------- servidor ----------
 const API = 'https://script.google.com/macros/s/AKfycbzFppJZh4JO-VMg4hkqiYCqijiD-oVPXUzzqiEEsyJEYa7A-gW_n848MmPKzBtrNERi/exec';
 const chave = new URLSearchParams(location.search).get('k') || '';
 function chamar(metodo, corpo) {
-  const opcoes = { method: metodo, credentials: 'omit', redirect: 'follow' };
+  const op = { method: metodo, credentials: 'omit', redirect: 'follow' };
   let url = API;
   if (metodo === 'GET') url += '?' + new URLSearchParams(corpo);
-  else { opcoes.headers = { 'Content-Type': 'text/plain;charset=utf-8' }; opcoes.body = JSON.stringify(corpo); }
-  return fetch(url, opcoes)
-    .then(r => { if (!r.ok) throw new Error('o servidor respondeu ' + r.status); return r.json(); })
+  else { op.headers = { 'Content-Type': 'text/plain;charset=utf-8' }; op.body = JSON.stringify(corpo); }
+  return fetch(url, op).then(r => { if (!r.ok) throw new Error('o servidor respondeu ' + r.status); return r.json(); })
     .then(d => { if (d && d.erro) throw new Error(d.erro); return d; });
 }
 
-// ---------- carregamento com etapa e tempo visíveis ----------
-const T0 = Date.now();
+// ---------- utilidades ----------
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = n => Number(n || 0).toLocaleString('pt-BR');
+const plural = (n, um, varios) => num(n) + ' ' + (n === 1 ? um : varios);
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const lista = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);
+// "2023-" → "desde 2023"; "2024-2025" → "2024–2025"; "2021; 2023" → "2021, 2023"
+const anosLegiveis = s => String(s || '').trim().replace(/^(\d{4})\s*-$/, 'desde $1').replace(/(\d{4})\s*-\s*(\d{4})/g, '$1–$2').replace(/\s*;\s*/g, ', ');
+// texto vindo da planilha que pode ter caminho cru (R5): caminho vira "a › b", "_" vira espaço
+function textoLegivel(s) {
+  return String(s || '')
+    .replace(/Meu computador/gi, 'Computador do grupo').replace(/Compartilhados/gi, 'Compartilhado com o grupo')
+    .replace(/Meu Drive/gi, 'Drive do grupo').replace(/\b[A-Z]:\\/g, 'PC do grupo › ')
+    .replace(/\s*[\\/]+\s*/g, ' › ').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// ---------- estado ----------
+let D = null, quem = '';
+const A = {}, P = {}, filhosP = {}, pedidos = [], decA = {};
+let lente = { linha: '', pessoa: '' }, abertos = new Set(), todos = new Set(), filtroFalta = '', ultimaBusca = '';
+
+function montar(d) {
+  D = d; quem = d.quem || '';
+  // assuntos
+  const ca = n => d.assuntos.cab.indexOf(n);
+  d.assuntos.linhas.forEach(r => {
+    const a = { id: r[ca('assunto_id')], pai: r[ca('pai')], tipo: r[ca('tipo')], titulo: r[ca('titulo')], anos: anosLegiveis(r[ca('anos')]),
+      coord: r[ca('coordenacao')], pessoas: r[ca('pessoas')], linhas: lista(r[ca('linhas')]), estado: r[ca('estado')],
+      ordem: +r[ca('ordem')] || 0, filhos: [], raizes: [], ef: new Set(), tambem: [], pedidos: [] };
+    A[a.id] = a;
+  });
+  Object.values(A).forEach(a => { if (A[a.pai]) A[a.pai].filhos.push(a); });
+  Object.values(A).forEach(a => a.filhos.sort((x, y) => x.ordem - y.ordem));
+  // pastas
+  const c = n => d.cab.indexOf(n);
+  d.linhas.forEach(r => {
+    const p = { id: r[c('pasta_id')], pai: r[c('pai')], arquivos: +r[c('arquivos')] || 0, proprios: +r[c('arquivos_proprios')] || 0,
+      sens: +r[c('sensiveis')] || 0, link: r[c('link')], nome: r[c('nome_legivel')] || 'Pasta sem nome', onde: r[c('onde_legivel')],
+      resumo: r[c('resumo_conteudo')], amostra: r[c('amostra')], own: lista(r[c('assuntos_da_pasta')]), ef: new Set(lista(r[c('assuntos')])),
+      tambem: lista(r[c('tambem_em')]), decisao: r[c('decisao')] || '', apagar: r[c('apagar')] || '' };
+    P[p.id] = p;
+  });
+  Object.values(P).forEach(p => { if (P[p.pai]) (filhosP[p.pai] = filhosP[p.pai] || []).push(p.id); });
+  // vínculos manuais ainda não refletidos na aba (gravados hoje pela página)
+  (d.vinculos_manuais || []).forEach(([pid, as, papel]) => aplicarVinculo(pid, as, papel, true));
+  Object.assign(decA, d.decisoes_assunto || {});
+  // pedidos
+  const cp = n => d.pedidos.cab.indexOf(n);
+  d.pedidos.linhas.forEach(r => {
+    const id = r[cp('pedido_id')], alvo = PEDIDO_ASSUNTO[id] || id.replace(/^ped-/, '');
+    const pe = { id, assunto: A[alvo] ? alvo : '', titulo: r[cp('assunto')], ano: r[cp('ano')], autor: r[cp('autor')],
+      falta: r[cp('o_que_falta')], quem: r[cp('a_quem_pedir')], estado: r[cp('estado')] || 'a_pedir',
+      evid: r[cp('evidencia')], obs: r[cp('observacao')] };
+    pedidos.push(pe);
+    if (pe.assunto) A[pe.assunto].pedidos.push(pe);
+  });
+  indexar();
+}
+
+function descendentesP(id, fn) { const pilha = [id]; while (pilha.length) { const k = pilha.pop(); fn(k); (filhosP[k] || []).forEach(f => pilha.push(f)); } }
+function aplicarVinculo(pid, as, papel, inicial) {
+  const p = P[pid]; if (!p || !A[as]) return;
+  if (papel === 'fora') { descendentesP(pid, k => P[k].ef.delete(as)); return; }
+  if (papel !== 'material') { if (!p.tambem.includes(as)) p.tambem.push(as); return; }
+  if (!p.own.includes(as)) p.own.push(as);
+  descendentesP(pid, k => P[k].ef.add(as));
+  if (!inicial) indexar();
+}
+function tirarVinculo(pid, as) {
+  const p = P[pid]; if (!p) return;
+  p.own = p.own.filter(x => x !== as);
+  // tira da pasta e das de baixo, a menos que uma pasta acima ou abaixo ainda tenha o assunto como próprio
+  const acima = q => { for (let x = P[q.pai]; x; x = P[x.pai]) if (x.own.includes(as)) return true; return false; };
+  if (!acima(p)) descendentesP(pid, k => { if (!P[k].own.includes(as) || k === pid) P[k].ef.delete(as); });
+  indexar();
+}
+
+// índices assunto → pastas
+function indexar() {
+  Object.values(A).forEach(a => { a.raizes = []; a.ef = new Set(); a.tambemP = []; });
+  Object.values(P).forEach(p => {
+    p.own.forEach(as => A[as] && A[as].raizes.push(p.id));
+    p.ef.forEach(as => A[as] && A[as].ef.add(p.id));
+    p.tambem.forEach(as => A[as] && A[as].tambemP.push(p.id));
+  });
+  // totais por galho: cada pasta contada uma vez
+  const total = a => { const s = new Set(a.ef); a.filhos.forEach(f => total(f).forEach(x => s.add(x))); a.efTotal = s; return s; };
+  if (A[RAIZ]) total(A[RAIZ]);
+}
+const arquivosDe = conj => { let s = 0; conj.forEach(id => s += P[id].proprios); return s; };
+
+// ---------- decisão efetiva (mesma regra do Revisao.gs) ----------
+function decisaoPasta(p) {
+  for (let q = p; q; q = P[q.pai]) {
+    if (q.decisao) return { v: q.decisao, de: 'pasta', pasta: q };
+    let melhor = null;
+    q.own.forEach(as => {
+      const d = decA[as];
+      if (d && p.ef.has(as) && (!melhor || PESO[d] > PESO[melhor.v])) melhor = { v: d, de: 'assunto', assunto: A[as] };
+    });
+    if (melhor) return melhor;
+  }
+  return { v: 'interno', de: 'padrao' };
+}
+function estadoAssunto(a) {
+  const pastas = [...a.ef];
+  const excecoes = pastas.filter(id => { const d = decisaoPasta(P[id]); return d.de === 'pasta'; }).length;
+  if (decA[a.id]) return { v: decA[a.id], texto: ROTULO[decA[a.id]] + (excecoes ? ', com exceções' : ''), revisado: true };
+  if (pastas.length && pastas.every(id => decisaoPasta(P[id]).de !== 'padrao')) return { v: 'misto', texto: 'Decidido pelas pastas', revisado: true };
+  if (excecoes) return { v: 'aberto', texto: 'Revisado em parte', revisado: false };
+  return { v: 'aberto', texto: 'Ainda não revisado', revisado: false };
+}
+function tituloDe(a) {
+  if (a.tipo === 'tfg') return 'TFG de ' + (lista(a.pessoas)[0] || '?') + (a.anos ? ' (' + a.anos + ')' : '');
+  return a.titulo;
+}
+function sobDe(a) { return a.tipo === 'tfg' ? a.titulo : ''; }
+function dentroDe(a, raizId) { for (let x = a; x; x = A[x.pai]) if (x.id === raizId) return true; return false; }
+function caminhoGalho(a) { const out = []; for (let x = A[a.pai]; x && x.id !== RAIZ; x = A[x.pai]) out.unshift(tituloDe(x)); return out; }
+const pedidosAbertos = a => a.pedidos.filter(p => p.estado === 'a_pedir' || p.estado === 'pedido' || p.estado === 'conferir');
+
+// ---------- lentes ----------
+function naLente(a) {
+  if (!lente.linha && !lente.pessoa) return null;
+  let ok = true;
+  if (lente.linha) ok = ok && a.linhas.includes(lente.linha);
+  if (lente.pessoa) {
+    const toks = norm(lente.pessoa).split(' ').filter(t => t.length > 2);
+    const alvo = norm((a.pessoas || '') + ' ' + (a.coord || ''));
+    ok = ok && toks.length > 0 && toks.every(t => alvo.includes(t));
+  }
+  return ok;
+}
+function temNaLente(a) { return naLente(a) || a.filhos.some(temNaLente); }
+function pessoasTodas() {
+  const s = new Set();
+  Object.values(A).forEach(a => lista(a.pessoas).concat(lista(a.coord)).forEach(n => s.add(n.replace(/\s*\(.*?\)\s*/g, ' ').trim())));
+  return [...s].filter(Boolean).sort((x, y) => x.localeCompare(y, 'pt-BR'));
+}
+
+// ---------- Tela 1 ----------
+function progresso() {
+  const soma = { liberado: 0, interno: 0, nao_incorporar: 0, aberto: 0 };
+  let total = 0;
+  Object.values(P).forEach(p => {
+    if (!p.proprios) return;
+    const d = decisaoPasta(p);
+    soma[d.de === 'padrao' ? 'aberto' : d.v] += p.proprios; total += p.proprios;
+  });
+  const comMaterial = Object.values(A).filter(a => a.raizes.length && !dentroDe(a, EM_ABERTO));
+  const revisados = comMaterial.filter(a => estadoAssunto(a).revisado).length;
+  const folhas = Object.values(A).filter(a => !GALHOS.includes(a.tipo) && !dentroDe(a, EM_ABERTO));
+  const comArquivo = folhas.filter(a => a.ef.size).length;
+  const revistos = total - soma.aberto;
+  const pct = k => total ? (100 * soma[k] / total) : 0;
+  return `<section class="progresso" aria-label="Quanto já foi revisado">
+    <p class="numeros">Você revisou ${num(revisados)} de ${num(comMaterial.length)} assuntos · ${num(revistos)} de ${num(total)} arquivos</p>
+    <p class="sec">${num(comArquivo)} de ${num(folhas.length)} assuntos têm arquivo no Drive do grupo.</p>
+    <div class="pilha" role="img" aria-label="Arquivos por decisão">
+      ${['liberado', 'interno', 'nao_incorporar'].map(k => `<span style="width:${pct(k)}%;background:${COR[k]}"></span>`).join('')}
+    </div>
+    <div class="legenda">
+      ${['liberado', 'interno', 'nao_incorporar'].map(k => `<span><i class="amostra-cor" style="background:${COR[k]}"></i>${ROTULO[k]}: ${num(soma[k])}</span>`).join('')}
+      <span><i class="amostra-cor" style="background:${COR.aberto}"></i>Ainda não revisado: ${num(soma.aberto)}</span>
+    </div>
+  </section>`;
+}
+
+function linhaArvore(a, nivel) {
+  const temFilhos = a.filhos.length > 0, aberto = abertos.has(a.id);
+  const est = estadoAssunto(a), arq = arquivosDe(a.efTotal || a.ef), lt = naLente(a);
+  const classe = lt === null ? '' : lt ? ' na-lente' : ' fora-lente';
+  const faltam = pedidosAbertos(a).length;
+  const meta = [a.anos, a.tipo === 'tfg' ? '' : a.coord].filter(Boolean).join(' · ');
+  const mostraEstado = !GALHOS.includes(a.tipo) || a.raizes.length;
+  let h = `<li><div class="no${classe}">
+    ${temFilhos ? `<button class="abrir" type="button" data-abrir="${esc(a.id)}" aria-expanded="${aberto}" aria-label="${aberto ? 'Fechar' : 'Abrir'} ${esc(tituloDe(a))}">${aberto ? '▾' : '▸'}</button>` : '<span class="sem-filhos"></span>'}
+    <button class="corpo" type="button" data-assunto="${esc(a.id)}">
+      <span class="titulo">${esc(tituloDe(a))}</span>
+      ${sobDe(a) ? `<span class="sec">${esc(sobDe(a))}</span>` : ''}
+      <span class="meta">${meta ? `<span>${esc(meta)}</span>` : ''}<span>${arq ? plural(arq, 'arquivo', 'arquivos') : 'Sem arquivo no Drive do grupo'}</span>
+        ${mostraEstado && arq ? `<span class="estado"><i class="amostra-cor" style="background:${COR[est.v] || COR.aberto}"></i>${esc(est.texto)}</span>` : ''}
+        ${faltam ? `<span class="tag-falta">Falta o arquivo</span>` : ''}
+        ${temFilhos ? `<span>${plural(a.filhos.length, 'item', 'itens')}</span>` : ''}</span>
+    </button></div>`;
+  if (temFilhos && aberto) h += listaNivel(a, nivel + 1);
+  return h + '</li>';
+}
+function listaNivel(a, nivel, filhos) {
+  filhos = filhos || a.filhos;
+  let vis = filhos, extraLente = false;
+  if (filhos.length > MAX && !todos.has(a.id)) {
+    vis = filhos.slice(0, MAX);
+    // com lente, o que está na lente aparece mesmo depois do sétimo
+    filhos.slice(MAX).forEach(f => { if (temNaLente(f) && lente.linha + lente.pessoa) { vis.push(f); extraLente = true; } });
+  }
+  const marcas = (todos.has(a.id) ? ' data-expandido' : '') + (extraLente ? ' data-lente' : '');
+  let h = `<ul class="${nivel === 0 ? 'arvore' : ''}" data-nivel="${esc(a.id)}"${marcas}>` + vis.map(f => linhaArvore(f, nivel)).join('') + '</ul>';
+  if (vis.length < filhos.length) h += `<div class="ver-todos"><button class="bt texto" type="button" data-todos="${esc(a.id)}">Ver todos (${num(filhos.length)})</button></div>`;
+  return h;
+}
+
+function blocoFaltas() {
+  const cont = {}; Object.keys(PEDIDO).forEach(k => cont[k] = 0);
+  pedidos.forEach(p => cont[p.estado] = (cont[p.estado] || 0) + 1);
+  let h = `<h2 class="rotulo" id="faltas">Material que falta</h2><p class="sec">Trabalhos e projetos sem arquivo encontrado no Drive do grupo nem no PC do grupo. Escolha um estado para ver a lista.</p>
+    <div class="faltas">${Object.keys(PEDIDO).map(k => `<button class="bt${filtroFalta === k ? ' ativo' : ''}" type="button" data-falta="${k}" aria-pressed="${filtroFalta === k}"><b>${num(cont[k])}</b>${PEDIDO[k]}</button>`).join('')}</div>`;
+  if (filtroFalta) {
+    const l = pedidos.filter(p => p.estado === filtroFalta);
+    h += `<div class="lista-pedidos">${l.length ? l.map(p => `<button class="bt" type="button" ${p.assunto ? `data-assunto="${esc(p.assunto)}"` : 'disabled'} style="width:100%;flex-direction:column;align-items:flex-start;gap:0">
+      <span>${esc(p.assunto ? tituloDe(A[p.assunto]) : textoLegivel(p.titulo))}</span><span class="sec">${esc(textoLegivel(p.falta))}${p.quem ? ' · pedir a ' + esc(textoLegivel(p.quem)) : ''}</span></button>`).join('') : '<p class="sec">Nenhum.</p>'}</div>`;
+  }
+  return h;
+}
+
+function telaInicio() {
+  const raiz = A[RAIZ];
+  if (!raiz) return '<p>A aba de assuntos está vazia. Avise Arthur.</p>';
+  const galhos = raiz.filhos.filter(f => f.id !== EM_ABERTO);
+  const linhaOpts = Object.keys(LINHAS).map(k => `<option value="${k}"${lente.linha === k ? ' selected' : ''}>${LINHAS[k]}</option>`).join('');
+  const nLente = (lente.linha || lente.pessoa) ? Object.values(A).filter(a => naLente(a)).length : 0;
+  return `<header>
+      <h1>Visualizador do Acervo ÉPURA</h1>
+      <p>Decida o que do Drive do grupo pode aparecer no site. Nada é apagado.</p>
+      ${progresso()}
+    </header>
+    <div class="ferramentas">
+      <div class="campo"><label for="busca">Procurar pessoa, projeto, ano ou pasta</label>
+        <input id="busca" type="search" autocomplete="off" value="${esc(ultimaBusca)}" placeholder="Ex.: Prainha, Jennifer, 2022"></div>
+      <div class="lentes">
+        <div class="campo"><label for="lente-linha">Linha de pesquisa</label>
+          <select id="lente-linha"><option value="">Todas</option>${linhaOpts}</select></div>
+        <div class="campo"><label for="lente-pessoa">Pessoa</label>
+          <input id="lente-pessoa" list="pessoas" autocomplete="off" value="${esc(lente.pessoa)}" placeholder="Nome">
+          <datalist id="pessoas">${pessoasTodas().map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+      </div>
+    </div>
+    <div id="resultados" class="resultados" aria-live="polite"></div>
+    ${lente.linha || lente.pessoa ? `<p class="aviso-lente">${nLente ? (nLente === 1 ? '1 assunto ligado à escolha aparece destacado.' : num(nLente) + ' assuntos ligados à escolha aparecem destacados.') : 'Nenhum assunto ligado a essa escolha.'}
+      <button class="bt texto" type="button" id="limpar-lente">Tirar a escolha</button></p>` : ''}
+    <h2 class="rotulo">Produção do grupo</h2>
+    ${listaNivel(raiz, 0, galhos)}
+    <div class="em-aberto">${A[EM_ABERTO] ? `<ul class="arvore">${linhaArvore(A[EM_ABERTO], 0)}</ul>` : ''}</div>
+    ${blocoFaltas()}
+    <footer id="rodape">${quem ? 'Suas decisões ficam registradas com o nome ' + esc(quem) + '. ' : ''}<span id="tempo"></span></footer>`;
+}
+
+function buscar(q) {
+  ultimaBusca = q;
+  const el = document.getElementById('resultados');
+  const n = norm(q.trim());
+  if (n.length < 2) { el.innerHTML = ''; return; }
+  const as = Object.values(A).filter(a => a.id !== RAIZ && norm([tituloDe(a), a.titulo, a.pessoas, a.coord, a.anos].join(' ')).includes(n)).slice(0, MAX);
+  const ps = Object.values(P).filter(p => norm(p.nome).includes(n)).sort((x, y) => y.arquivos - x.arquivos).slice(0, MAX);
+  el.innerHTML = (as.length || ps.length ? '' : '<p class="sec">Nada encontrado.</p>') +
+    as.map(a => `<button class="bt" type="button" data-assunto="${esc(a.id)}"><span>${esc(tituloDe(a))}</span><span class="sec">${esc([a.anos, caminhoGalho(a).slice(-1)[0]].filter(Boolean).join(' · '))}</span></button>`).join('') +
+    ps.map(p => `<button class="bt" type="button" data-pasta="${esc(p.id)}"><span>Pasta ${esc(p.nome)}</span><span class="sec">${esc(p.onde || 'Drive do grupo')} · ${plural(p.arquivos, 'arquivo', 'arquivos')}</span></button>`).join('');
+}
+
+// ---------- Tela 2 ----------
+function botoesDecisao(atual, classe) {
+  return ['liberado', 'interno', 'nao_incorporar'].map(v => `<button class="bt${atual === v ? ' ativo' : ''}" type="button" data-v="${v}" aria-pressed="${atual === v}">
+    <span>${BOTAO[v]}</span>${classe === 'grande' ? `<small>${EXPLICA[v]}</small>` : ''}</button>`).join('');
+}
+function cartaoPasta(p, a, foco) {
+  const d = decisaoPasta(p);
+  const segue = d.de === 'pasta' && d.pasta === p ? 'Decisão desta pasta: ' + ROTULO[d.v] + '.'
+    : d.de === 'pasta' ? `Esta pasta segue a decisão de ${esc(d.pasta.nome)}: ${ROTULO[d.v]}.`
+    : d.de === 'assunto' ? `Esta pasta segue a decisão de ${esc(tituloDe(d.assunto))}: ${ROTULO[d.v]}.`
+    : 'Ainda não revisada. Enquanto isso, fica só para o grupo.';
+  const outros = [...new Set(p.own.concat(p.tambem))].filter(x => x !== a.id && A[x]);
+  const sub = p.arquivos - p.proprios;
+  return `<article class="cartao${foco ? ' foco' : ''}" data-cartao="${esc(p.id)}" id="pasta-${esc(p.id)}">
+    <h3>${esc(p.nome)}</h3>
+    ${p.onde ? `<div class="onde">Em ${esc(p.onde)}</div>` : ''}
+    <p class="sec" style="margin-top:4px">${esc(p.resumo || '')}${sub > 0 ? ` (${plural(sub, 'arquivo está', 'arquivos estão')} em pastas dentro desta)` : ''}</p>
+    ${p.amostra ? `<div class="amostra">Alguns arquivos: ${esc(p.amostra)}</div>` : ''}
+    ${p.sens ? `<div class="pessoais">${plural(p.sens, 'arquivo parece documento pessoal', 'arquivos parecem documentos pessoais')} (atestados, currículos, respostas de formulário). ${p.sens === 1 ? 'Ele não vai' : 'Eles não vão'} para o site mesmo que você libere esta pasta.</div>` : ''}
+    <p class="segue">${segue}</p>
+    <p class="sec" style="margin:10px 0 0">Decisão só desta pasta:</p>
+    <div class="botoes-pasta" data-pasta-decisao="${esc(p.id)}">${botoesDecisao(p.decisao, 'pequeno')}
+      ${p.decisao ? `<button class="bt texto" type="button" data-limpar-pasta="${esc(p.id)}">Seguir o assunto</button>` : ''}</div>
+    <div class="linha-bts acoes">
+      <button class="bt leve" type="button" data-apagar="${esc(p.id)}" aria-pressed="${p.apagar === 'sim'}">${p.apagar === 'sim' ? 'Sugestão de apagar marcada (tirar)' : 'Sugerir apagar do Drive'}</button>
+      ${p.link ? `<a class="bt leve" href="${esc(p.link)}" target="_blank" rel="noopener">Abrir no Drive</a>` : ''}
+      <button class="bt leve" type="button" data-ligar="${esc(p.id)}">Ligar a outro assunto</button>
+    </div>
+    ${p.apagar === 'sim' ? '<p class="sec" style="margin-top:6px">É só uma sugestão: nada é apagado do Drive por esta página.</p>' : ''}
+    ${outros.length ? `<p class="sec" style="margin-top:8px">Também usado em: ${outros.map(x => `<button class="bt texto" type="button" data-assunto="${esc(x)}">${esc(tituloDe(A[x]))}</button>`).join(', ')}</p>` : ''}
+    <div class="ligar" data-painel-ligar="${esc(p.id)}" hidden></div>
+  </article>`;
+}
+function cartaoPedido(pe) {
+  return `<article class="cartao pedido">
+    <h3>${esc(textoLegivel(pe.falta))}</h3>
+    ${pe.quem ? `<p class="sec">Pedir a ${esc(textoLegivel(pe.quem))}</p>` : ''}
+    ${pe.evid ? `<p class="sec">Já achado: ${esc(textoLegivel(pe.evid))}</p>` : ''}
+    ${pe.obs ? `<p class="sec">${esc(textoLegivel(pe.obs))}</p>` : ''}
+    <p class="estado" style="margin-top:6px">Estado: ${PEDIDO[pe.estado] || pe.estado}</p>
+    <div class="bts-pedido">${Object.keys(PEDIDO).map(k => `<button class="bt${pe.estado === k ? ' ativo' : ''}" type="button" data-pedido="${esc(pe.id)}" data-estado="${k}" aria-pressed="${pe.estado === k}">${PEDIDO[k]}</button>`).join('')}</div>
+  </article>`;
+}
+
+function telaAssunto(id, focoPasta) {
+  const a = A[id];
+  if (!a) return '<p>Assunto não encontrado.</p><button class="bt" type="button" data-inicio>Voltar ao início</button>';
+  const est = estadoAssunto(a), arq = arquivosDe(a.efTotal || a.ef);
+  const pessoas = a.tipo === 'tfg' ? '' : lista(a.pessoas).join(', ');
+  const meta = [a.anos, a.coord ? 'Coordenação: ' + lista(a.coord).join(', ') : '', a.linhas.map(l => LINHAS[l]).join(', ')].filter(Boolean);
+  let raizes = a.raizes.map(x => P[x]).sort((x, y) => y.arquivos - x.arquivos);
+  let extra = '';
+  if (focoPasta && P[focoPasta]) {
+    // pasta procurada: o cartão dela, ou o da pasta de cima que está na lista
+    let alvo = null;
+    for (let q = P[focoPasta]; q; q = P[q.pai]) if (raizes.includes(q)) { alvo = q; break; }
+    if (!alvo) extra = `<h2 class="rotulo">Pasta procurada</h2>${cartaoPasta(P[focoPasta], a, true)}`;
+    else if (alvo.id !== focoPasta) extra = `<p class="sec">A pasta ${esc(P[focoPasta].nome)} fica dentro de ${esc(alvo.nome)}, abaixo.</p>`;
+    focoPasta = alvo ? alvo.id : focoPasta;
+  }
+  const verTodas = todos.has('pastas:' + id);
+  const visiveis = verTodas ? raizes : raizes.slice(0, MAX);
+  const tambem = a.tambemP.map(x => P[x]).filter(p => !raizes.includes(p));
+  const caminho = caminhoGalho(a);
+  return `<p><button class="bt" type="button" data-inicio>← Voltar ao início</button></p>
+    ${caminho.length ? `<p class="caminho-galho">${caminho.map(esc).join(' › ')}</p>` : ''}
+    <h2>${esc(tituloDe(a))}</h2>
+    ${sobDe(a) ? `<p>${esc(sobDe(a))}</p>` : ''}
+    ${meta.length ? `<p class="sec">${meta.map(esc).join(' · ')}</p>` : ''}
+    ${pessoas ? `<p class="sec">Pessoas: ${esc(pessoas)}</p>` : ''}
+    <p>${arq ? `${plural(arq, 'arquivo', 'arquivos')} em ${plural(raizes.length, 'pasta', 'pastas')}` : 'Nenhum arquivo deste assunto foi achado no Drive do grupo.'}</p>
+    ${raizes.length ? `<h2 class="rotulo">Decisão do assunto inteiro</h2>
+      <p class="estado"><i class="amostra-cor" style="background:${COR[est.v] || COR.aberto}"></i>${esc(est.texto)}</p>
+      <div class="decisao-grande" data-assunto-decisao="${esc(a.id)}">${botoesDecisao(decA[a.id], 'grande')}</div>
+      <p class="sec" style="margin-top:8px">Vale para ${raizes.length === 1 ? 'a pasta abaixo' : 'as ' + num(raizes.length) + ' pastas abaixo'}. Você pode mudar uma pasta só.
+        ${decA[a.id] ? `<button class="bt texto" type="button" data-limpar-assunto="${esc(a.id)}">Tirar a decisão do assunto</button>` : ''}</p>` : ''}
+    ${a.pedidos.length ? `<h2 class="rotulo">O que falta e a quem pedir</h2>${a.pedidos.map(cartaoPedido).join('')}` : ''}
+    ${extra}
+    ${raizes.length ? `<h2 class="rotulo">Pastas</h2>${visiveis.map(p => cartaoPasta(p, a, p.id === focoPasta)).join('')}
+      ${visiveis.length < raizes.length ? `<p><button class="bt texto" type="button" data-todas-pastas="${esc(id)}">Ver todas (${num(raizes.length)})</button></p>` : ''}` : ''}
+    ${tambem.length ? `<h2 class="rotulo">Também usado aqui</h2><p class="sec">Pastas de outros assuntos que servem a este.</p>${tambem.slice(0, MAX).map(p => cartaoPasta(p, a)).join('')}` : ''}
+    ${a.filhos.length ? `<h2 class="rotulo">Dentro deste</h2>${listaNivel(a, 0)}` : ''}`;
+}
+
+function painelLigar(pid) {
+  const el = document.querySelector(`[data-painel-ligar="${CSS.escape(pid)}"]`);
+  if (!el) return;
+  if (!el.hidden) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="campo"><label for="ligar-${esc(pid)}">A que assunto esta pasta também pertence?</label>
+    <input id="ligar-${esc(pid)}" type="search" autocomplete="off" placeholder="Digite parte do nome"></div><div class="resultados"></div>`;
+  const inp = el.querySelector('input'), res = el.querySelector('.resultados');
+  inp.focus();
+  inp.oninput = () => {
+    const n = norm(inp.value.trim());
+    if (n.length < 2) { res.innerHTML = ''; return; }
+    const as = Object.values(A).filter(a => !GALHOS.includes(a.tipo) && !P[pid].own.includes(a.id) &&
+      norm([tituloDe(a), a.titulo, a.pessoas, a.anos].join(' ')).includes(n)).slice(0, MAX);
+    res.innerHTML = as.map(a => `<button class="bt" type="button" data-vincular="${esc(pid)}" data-com="${esc(a.id)}"><span>${esc(tituloDe(a))}</span><span class="sec">${esc(caminhoGalho(a).slice(-1)[0] || '')}</span></button>`).join('') || '<p class="sec">Nada encontrado.</p>';
+  };
+}
+
+// ---------- gravar, com retorno e desfazer (R9) ----------
+let desfazerAcao = null, timerBarra = null;
+function barra(texto, erro, desfazer) {
+  const b = document.getElementById('barra');
+  document.getElementById('barra-texto').textContent = texto;
+  b.classList.toggle('erro', !!erro);
+  document.getElementById('desfazer').hidden = !desfazer;
+  desfazerAcao = desfazer || null;
+  b.style.display = 'flex';
+  clearTimeout(timerBarra);
+  timerBarra = setTimeout(() => { b.style.display = 'none'; desfazerAcao = null; }, 8000);
+}
+document.getElementById('desfazer').onclick = () => { const f = desfazerAcao; document.getElementById('barra').style.display = 'none'; if (f) f(); };
+
+// muda na tela na hora; grava no servidor; se falhar, volta
+function gravar(campo, alvo, valor, aplicar, voltar, ehDesfazer) {
+  aplicar(); render();
+  const desfazer = ehDesfazer ? null : () => gravar(campo === 'vinculo' ? 'desfazer_vinculo' : campo, alvo, campo === 'vinculo' ? valor : null, voltar, aplicar, true);
+  const ok = () => barra(ehDesfazer ? 'Desfeito.' : 'Salvo.', false, desfazer);
+  const falha = () => { voltar(); render(); barra('Não salvou. Tente de novo.', true); };
+  if (window.DADOS_TESTE) return ok();
+  chamar('POST', { k: chave, alvo, campo, valor: campo === 'desfazer_vinculo' ? valor : (valor == null ? '' : valor) }).then(ok, falha);
+}
+function gravarValor(campo, alvo, novo, obter, definir) {
+  const antes = obter();
+  if (antes === novo) return;
+  const ida = () => definir(novo), volta = () => definir(antes);
+  ida(); render();
+  const desfazer = () => { volta(); render(); enviar(antes, true); };
+  const enviar = (valor, ehDesfazer) => {
+    const ok = () => barra(ehDesfazer ? 'Desfeito.' : 'Salvo.', false, ehDesfazer ? null : desfazer);
+    const falha = () => { (ehDesfazer ? ida : volta)(); render(); barra('Não salvou. Tente de novo.', true); };
+    if (window.DADOS_TESTE) return ok();
+    chamar('POST', { k: chave, alvo, campo, valor }).then(ok, falha);
+  };
+  enviar(novo, false);
+}
+
+// ---------- navegação ----------
+function rota() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  const m = /^assunto\/([a-z0-9-]+)(?:\/pasta\/([A-Za-z0-9_-]+))?$/.exec(h);
+  return m ? { tela: 'assunto', id: m[1], pasta: m[2] } : { tela: 'inicio' };
+}
+let rolagemInicio = 0;
+function ir(hash) { if (rota().tela === 'inicio') rolagemInicio = scrollY; location.hash = hash; }
+function render() {
+  const r = rota(), app = document.getElementById('app'), y = scrollY;
+  app.innerHTML = r.tela === 'assunto' ? telaAssunto(r.id, r.pasta) : telaInicio();
+  if (r.tela === 'inicio') { if (ultimaBusca) buscar(ultimaBusca); }
+  window.scrollTo(0, y);
+  ligarEventos();
+  tempo();
+}
+window.addEventListener('hashchange', () => {
+  const r = rota();
+  render();
+  if (r.tela === 'inicio') window.scrollTo(0, rolagemInicio);
+  else if (r.pasta) { const c = document.querySelector('.cartao.foco'); c ? c.scrollIntoView({ block: 'center' }) : window.scrollTo(0, 0); }
+  else window.scrollTo(0, 0);
+});
+
+function ligarEventos() {
+  const app = document.getElementById('app');
+  const b = document.getElementById('busca');
+  if (b) b.oninput = () => buscar(b.value);
+  const ll = document.getElementById('lente-linha');
+  if (ll) ll.onchange = () => { lente.linha = ll.value; abrirLente(); render(); };
+  const lp = document.getElementById('lente-pessoa');
+  if (lp) lp.onchange = () => { lente.pessoa = lp.value.trim(); abrirLente(); render(); };
+  const limpar = document.getElementById('limpar-lente');
+  if (limpar) limpar.onclick = () => { lente = { linha: '', pessoa: '' }; render(); };
+}
+function abrirLente() {
+  if (!lente.linha && !lente.pessoa) return;
+  Object.values(A).forEach(a => { if (a.filhos.some(temNaLente)) abertos.add(a.id); });
+}
+
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('button, a');
+  if (!t || t.disabled) return;
+  const ds = t.dataset;
+  if ('inicio' in ds) return ir('');
+  if (ds.abrir) { abertos.has(ds.abrir) ? abertos.delete(ds.abrir) : abertos.add(ds.abrir); return render(); }
+  if (ds.todos) { todos.add(ds.todos); return render(); }
+  if (ds.todasPastas) { todos.add('pastas:' + ds.todasPastas); return render(); }
+  if (ds.falta) { filtroFalta = filtroFalta === ds.falta ? '' : ds.falta; return render(); }
+  if (ds.pasta && !ds.estado) {
+    const p = P[ds.pasta], as = p && ([...p.ef][0] || (A['aberto-a-identificar'] ? 'aberto-a-identificar' : ''));
+    return as && ir('assunto/' + as + '/pasta/' + p.id);
+  }
+  if (ds.assunto && t.classList.contains('bt') || ds.assunto && t.classList.contains('corpo')) return ir('assunto/' + ds.assunto);
+  if (ds.v) {
+    const caixaA = t.closest('[data-assunto-decisao]'), caixaP = t.closest('[data-pasta-decisao]');
+    if (caixaA) { const id = caixaA.dataset.assuntoDecisao;
+      return gravarValor('decisao_assunto', id, ds.v, () => decA[id] || '', v => { if (v) decA[id] = v; else delete decA[id]; }); }
+    if (caixaP) { const p = P[caixaP.dataset.pastaDecisao];
+      return gravarValor('decisao', p.id, ds.v, () => p.decisao, v => p.decisao = v); }
+  }
+  if (ds.limparAssunto) { const id = ds.limparAssunto; return gravarValor('decisao_assunto', id, '', () => decA[id] || '', v => { if (v) decA[id] = v; else delete decA[id]; }); }
+  if (ds.limparPasta) { const p = P[ds.limparPasta]; return gravarValor('decisao', p.id, '', () => p.decisao, v => p.decisao = v); }
+  if (ds.apagar) { const p = P[ds.apagar]; return gravarValor('apagar', p.id, p.apagar === 'sim' ? '' : 'sim', () => p.apagar, v => p.apagar = v); }
+  if (ds.pedido) { const pe = pedidos.find(x => x.id === ds.pedido); return gravarValor('estado_pedido', pe.id, ds.estado, () => pe.estado, v => pe.estado = v); }
+  if (ds.ligar) return painelLigar(ds.ligar);
+  if (ds.vincular) {
+    const pid = ds.vincular, as = ds.com;
+    return gravar('vinculo', pid, as, () => aplicarVinculo(pid, as, 'material'), () => tirarVinculo(pid, as));
+  }
+});
+
+// ---------- carregamento (R10) ----------
+const T0 = performance.now();
 let etapa = 'abrindo a página';
-const telaEl = document.getElementById('tela');
-const relogioCarga = setInterval(() => {
-  const s = Math.round((Date.now() - T0) / 1000);
-  telaEl.textContent = 'Carregando as pastas… ' + etapa + ' (' + s + ' s)' +
+const relogio = setInterval(() => {
+  const s = Math.round((performance.now() - T0) / 1000);
+  document.getElementById('etapa').textContent = 'Carregando o acervo: ' + etapa + ' (' + s + ' s)' +
     (s >= 25 ? '. Está demorando mais que o normal; se passar de 60 s, recarregue a página.' : '');
 }, 1000);
-window.addEventListener('error', e => {
-  clearInterval(relogioCarga);
-  telaEl.textContent = 'Erro ao montar a página (' + etapa + '): ' + (e.message || e.type) +
-    (typeof d3 === 'undefined' ? '. A biblioteca de desenho (d3) não carregou; verifique a internet ou recarregue.' : '');
-});
-
-// ---------- dados ----------
-function carregar() {
-  if (typeof d3 === 'undefined') { etapa = 'baixando a biblioteca de desenho'; return setTimeout(carregar, 300); }
-  if (!window.DADOS_TESTE) {
-    etapa = 'lendo a planilha do Catálogo';
-    chamar('GET', { acao: 'dados', k: chave }).then(iniciar, erroInicial);
-  } else if (window.DADOS_TESTE) {
-    iniciar(window.DADOS_TESTE);   // pré-visualização local
-  } else {
-    erroInicial({ message: 'sem dados' });
-  }
+function tempo() {
+  const el = document.getElementById('tempo');
+  if (el && window.CARREGOU) el.textContent = 'Carregou em ' + window.CARREGOU + ' s.';
 }
 function erroInicial(e) {
-  clearInterval(relogioCarga);
+  clearInterval(relogio);
   const m = String(e && e.message || e);
-  document.getElementById('tela').textContent = m.includes('SEM_CHAVE')
+  document.getElementById('etapa').textContent = m.includes('SEM_CHAVE')
     ? 'Este link não abre o visualizador. Use o link pessoal que o grupo enviou para você, ou peça um novo a Arthur.'
-    : m.includes('SEM_ACESSO')
-    ? 'A página não conseguiu abrir a planilha do Catálogo. Avise Arthur.'
-    : m.includes('SEM_REVISAO')
-      ? 'A aba "Revisão de pastas" ainda não existe. Rode recalcular() no projeto do Catálogo.'
-      : 'Não foi possível carregar: ' + m;
+    : m.includes('SEM_ACESSO') ? 'A página não conseguiu abrir a planilha do Catálogo. Avise Arthur.'
+    : 'Não foi possível carregar: ' + m;
 }
-function salvar(no, campo, valor) {
-  const antes = no.data[campo];
-  no.data[campo] = valor;
-  atualizarTudo();
-  const ok = () => aviso('Salvo.');
-  const falha = e => { no.data[campo] = antes; atualizarTudo(); aviso('Não salvou: ' + (e && e.message || e)); };
-  if (!window.DADOS_TESTE)
-    chamar('POST', { k: chave, pasta: no.data.id, campo, valor }).then(ok, falha);
-  else ok();
-}
-function aviso(t) {
-  const m = document.getElementById('msg'); m.textContent = t; m.style.display = 'block';
-  clearTimeout(aviso._t); aviso._t = setTimeout(() => m.style.display = 'none', 2200);
-}
-
 function iniciar(d) {
-  etapa = 'desenhando a árvore';
-  quem = d.quem || '';
-  const msServidor = d.ms_servidor;
-  const c = n => d.cab.indexOf(n);
-  const itens = d.linhas.map(r => ({
-    id: r[c('pasta_id')], pai: r[c('pai')], caminho: r[c('caminho')], nome: r[c('caminho')].split('/').pop(),
-    arquivos: +r[c('arquivos')] || 0, documentos: +r[c('documentos')] || 0, imagens: +r[c('imagens')] || 0,
-    gis: +r[c('gis')] || 0, mb: +r[c('tamanho_mb')] || 0, modificado: r[c('modificado')], projeto: r[c('projeto_mais_comum')],
-    sensiveis: +r[c('sensiveis')] || 0, link: r[c('link')],
-    decisao: r[c('decisao')] || '', apagar: r[c('apagar')] || '', observacao: r[c('observacao')] || ''
-  }));
-  const ids = new Set(itens.map(i => i.id));
-  const topo = { id: '__raiz', pai: null, nome: 'Drive do ÉPURA', caminho: '', arquivos: 0, decisao: '' };
-  itens.forEach(i => { if (!i.pai || !ids.has(i.pai)) i.pai = '__raiz'; });
-  topo.arquivos = itens.filter(i => i.pai === '__raiz').reduce((s, i) => s + i.arquivos, 0);
-  raiz = d3.stratify().id(i => i.id).parentId(i => i.pai)([topo].concat(itens));
-  raiz.sort((a, b) => b.data.arquivos - a.data.arquivos);
-  raiz.each(n => { porId[n.data.id] = n; n._filhos = n.children; });
-  // começa mostrando dois níveis abaixo das raízes
-  raiz.each(n => { n.children = n._filhos && n.depth < 2 ? visiveis(n) : null; });
-  clearInterval(relogioCarga);
-  document.getElementById('tela').style.display = 'none';
-  document.getElementById('app').style.display = '';
-  montarSvg();
-  atualizarTudo();
-  // tempo de carga no rodapé do painel, para diagnóstico
-  const total = ((Date.now() - T0) / 1000).toFixed(1).replace('.', ',');
-  const srv = msServidor != null ? ' (planilha: ' + (msServidor / 1000).toFixed(1).replace('.', ',') + ' s)' : '';
-  document.getElementById('painel').insertAdjacentHTML('beforeend', '<p class="estado">Carregou em ' + total + ' s' + srv + '.</p>');
+  etapa = 'montando a árvore';
+  montar(d);
+  clearInterval(relogio);
+  window.CARREGOU = ((performance.now() - T0) / 1000).toFixed(1).replace('.', ',');
+  document.getElementById('carregando').hidden = true;
+  document.getElementById('app').hidden = false;
+  render();
 }
-
-// Até MAX subpastas por pasta (as maiores); o resto vira um nó "+N pastas menores", que abre ao clicar.
-const MAX = 20;
-function visiveis(n) {
-  const f = n._filhos || [];
-  if (n._todos || f.length <= MAX) return f.slice();
-  const resto = f.slice(MAX - 1);
-  const s = d3.hierarchy({ id: n.data.id + '__mais', nome: '+' + resto.length + ' pastas menores',
-                           caminho: n.data.caminho, arquivos: resto.reduce((t, x) => t + x.data.arquivos, 0), sintetico: true });
-  s.parent = n; s.depth = n.depth + 1; s.children = undefined;
-  return f.slice(0, MAX - 1).concat([s]);
-}
-
-// ---------- decisão efetiva (herança) ----------
-function efetiva(n) {
-  for (let p = n; p; p = p.parent) if (p.data.decisao) return { valor: p.data.decisao, de: p === n ? null : p };
-  return { valor: 'interno', de: null, padrao: true };
-}
-
-// ---------- desenho ----------
-let svg, g, zoom;
-function montarSvg() {
-  svg = d3.select('#grafo');
-  g = svg.append('g');
-  g.append('g').attr('class', 'links');
-  g.append('g').attr('class', 'nos');
-  zoom = d3.zoom().scaleExtent([0.2, 8]).on('zoom', e => g.attr('transform', e.transform));
-  svg.call(zoom);
-  enquadrar(false);
-}
-const ANEL = 130;   // distância entre níveis da árvore, em px
-function alturaVisivel() { let h = 0; raiz.each(n => { if (n.depth > h) h = n.depth; }); return h; }
-function enquadrar(animado) {
-  const b = svg.node().getBoundingClientRect(), R = alturaVisivel() * ANEL + 140;
-  const t = d3.zoomIdentity.translate(b.width / 2, b.height / 2).scale(Math.min(1.2, Math.min(b.width, b.height) / (2 * R)));
-  (animado ? svg.transition().duration(500) : svg).call(zoom.transform, t);
-}
-const raio = n => n.depth === 0 ? 6 : Math.min(24, 2.5 + Math.sqrt(n.data.arquivos) * 0.32);
-
-function atualizarTudo() { desenhar(); resumo(); if (selecionado) painel(selecionado); }
-
-function desenhar() {
-  const R = Math.max(1, alturaVisivel()) * ANEL;
-  const arvore = d3.tree().size([2 * Math.PI, R]).separation((a, c) => (a.parent === c.parent ? 1 : 2) / Math.max(1, a.depth));
-  arvore(raiz);
-  const ponto = n => [n.y * Math.cos(n.x - Math.PI / 2), n.y * Math.sin(n.x - Math.PI / 2)];
-
-  const links = g.select('.links').selectAll('path').data(raiz.links(), l => l.target.data.id);
-  links.exit().remove();
-  links.enter().append('path').attr('class', 'link').merge(links)
-    .attr('d', d3.linkRadial().angle(n => n.x).radius(n => n.y))
-    .attr('stroke-opacity', l => efetiva(l.target).valor === 'nao_incorporar' ? 0.35 : 1);
-
-  const nos = g.select('.nos').selectAll('g.no').data(raiz.descendants(), n => n.data.id);
-  nos.exit().remove();
-  const novo = nos.enter().append('g').attr('class', 'no');
-  novo.append('circle').attr('class', 'sens');
-  novo.append('circle').attr('class', 'corpo')
-    .on('click', (e, n) => { e.stopPropagation(); clicar(n); })
-    .append('title');
-  novo.append('text');
-  const todos = novo.merge(nos);
-  todos.attr('transform', n => 'translate(' + ponto(n) + ')');
-  todos.select('circle.sens')
-    .attr('r', n => raio(n) + 2.5).attr('fill', 'none')
-    .attr('stroke', n => n.data.sensiveis ? '#f07c6e' : 'none').attr('stroke-width', 1.5);
-  todos.select('circle.corpo')
-    .attr('r', raio)
-    .attr('fill', n => { const e = efetiva(n); return n.depth === 0 ? '#2b2a27' : e.valor === 'nao_incorporar' ? '#fff' : COR[e.valor]; })
-    .attr('fill-opacity', n => { const e = efetiva(n); return n.depth === 0 ? 1 : e.valor === 'nao_incorporar' ? 0.6 : (n.data.decisao ? 0.9 : 0.35); })
-    .attr('stroke', n => { const e = efetiva(n); return n === selecionado ? '#2b2a27' : e.valor === 'nao_incorporar' ? '#a3324f' : n.data.decisao ? d3.color(COR[e.valor]).darker(0.6) : 'none'; })
-    .attr('stroke-width', n => n === selecionado ? 2.5 : 1.2)
-    .attr('stroke-dasharray', n => efetiva(n).valor === 'nao_incorporar' ? '3 2' : null)
-    .select('title').text(n => n.data.nome + ' · ' + n.data.arquivos.toLocaleString('pt-BR') + ' arquivos' +
-                              (n._filhos && !n.children ? ' · clique para abrir' : ''));
-  todos.select('text')
-    .attr('class', n => 'rotulo' + (n.depth <= 1 ? ' forte' : ''))
-    .attr('dy', '0.32em')
-    .attr('x', n => (n.x < Math.PI ? 1 : -1) * (raio(n) + 4))
-    .attr('text-anchor', n => n.x < Math.PI ? 'start' : 'end')
-    .attr('transform', n => n.depth === 0 ? null : 'rotate(' + ((n.x * 180 / Math.PI - 90) + (n.x < Math.PI ? 0 : 180)) + ')')
-    .text(n => (n.depth <= 1 || n.data.arquivos >= 150 || n === selecionado) ? corta(n.data.nome, 28) : '');
-}
-const corta = (s, k) => s.length > k ? s.slice(0, k - 1) + '…' : s;
-
-function clicar(n) {
-  if (n.data.sintetico) {        // "+N pastas menores": mostra todas as subpastas do pai
-    n.parent._todos = true; n.parent.children = visiveis(n.parent);
-    selecionado = n.parent; atualizarTudo(); return;
-  }
-  if (n._filhos) n.children = n.children ? (n === selecionado ? null : n.children) : visiveis(n);
-  selecionado = n;
-  atualizarTudo();
-}
-
-// ---------- painel ----------
-function painel(n) {
-  const d = n.data, e = efetiva(n), el = document.getElementById('painel');
-  if (n.depth === 0) { el.innerHTML = '<p class="vazio">Escolha uma pasta.</p>'; return; }
-  const num = v => Number(v).toLocaleString('pt-BR');
-  const origem = d.decisao ? 'Decisão desta pasta.' : e.de ? 'Herdada de “' + esc(e.de.data.nome) + '”.' : 'Sem decisão: fica como interno.';
-  el.innerHTML = `
-    <h2>${esc(d.nome)}</h2>
-    <div class="caminho">${esc(d.caminho)}</div>
-    <dl class="numeros">
-      <div><dt>Arquivos</dt><dd>${num(d.arquivos)}</dd></div>
-      <div><dt>Documentos</dt><dd>${num(d.documentos)}</dd></div>
-      <div><dt>Imagens</dt><dd>${num(d.imagens)}</dd></div>
-      <div><dt>GIS</dt><dd>${num(d.gis)}</dd></div>
-      <div><dt>Tamanho</dt><dd>${d.mb >= 1024 ? (d.mb / 1024).toFixed(1).replace('.', ',') + ' GB' : num(d.mb) + ' MB'}</dd></div>
-      <div><dt>Última mudança</dt><dd>${esc(d.modificado || '—')}</dd></div>
-      <div style="grid-column:1/-1"><dt>Projeto sugerido</dt><dd>${esc(d.projeto || '—')}</dd></div>
-    </dl>
-    ${d.sensiveis ? `<div class="aviso">${num(d.sensiveis)} arquivo(s) parecem pessoais (atestado, currículo, formulário). Eles ficam fora do site mesmo se a pasta for liberada.</div>` : ''}
-    <div class="rot">Decisão</div>
-    <div class="botoes">
-      ${['liberado', 'interno', 'nao_incorporar'].map(v => `
-        <button data-v="${v}" class="${e.valor === v ? 'ativo' : ''}">
-          <span class="amostra" style="${v === 'nao_incorporar' ? 'border:1.5px dashed #a3324f;background:#fff' : 'background:' + COR[v]}"></span>
-          <span>${ROTULOS[v]}<small>${{ liberado: 'vai para o site do grupo', interno: 'fica no grafo e no Obsidian, só para o grupo', nao_incorporar: 'sai do grafo e do Obsidian; continua no Drive' }[v]}</small></span>
-        </button>`).join('')}
-    </div>
-    <div class="estado">${origem} ${d.decisao ? '<button class="limpar" id="herdar">voltar a herdar</button>' : ''}</div>
-    <div class="rot">Drive</div>
-    <label class="chk"><input type="checkbox" id="apagar" ${d.apagar === 'sim' ? 'checked' : ''}> Sugerir apagar esta pasta do Drive</label>
-    <div class="estado">Nada é apagado automaticamente; a sugestão vai para uma lista.</div>
-    <div class="rot">Observação</div>
-    <textarea id="obs" maxlength="500" placeholder="Opcional">${esc(d.observacao)}</textarea>
-    <div class="acoes"><button id="salvarObs">Salvar observação</button>${d.link ? `<a href="${esc(d.link)}" target="_blank" rel="noopener">Abrir no Drive</a>` : ''}</div>
-    ${quem ? `<div class="estado" style="margin-top:18px">Decisões registradas como ${esc(quem)}.</div>` : ''}`;
-  el.querySelectorAll('.botoes button').forEach(b => b.onclick = () => salvar(n, 'decisao', b.dataset.v));
-  const h = el.querySelector('#herdar'); if (h) h.onclick = () => salvar(n, 'decisao', '');
-  el.querySelector('#apagar').onchange = ev => salvar(n, 'apagar', ev.target.checked ? 'sim' : '');
-  el.querySelector('#salvarObs').onclick = () => salvar(n, 'observacao', el.querySelector('#obs').value);
-}
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-
-// ---------- resumo: arquivos por decisão (cada arquivo contado uma vez) ----------
-function resumo() {
-  const soma = { liberado: 0, interno: 0, nao_incorporar: 0 }, pastas = { liberado: 0, interno: 0, nao_incorporar: 0 };
-  // percorre a árvore inteira (_filhos), não só as pastas abertas no desenho
-  const pilha = [raiz];
-  while (pilha.length) {
-    const n = pilha.pop();
-    (n._filhos || []).forEach(f => pilha.push(f));
-    if (n.depth === 0) continue;
-    const proprios = n.data.arquivos - (n._filhos || []).reduce((s, f) => s + f.data.arquivos, 0);
-    const v = efetiva(n).valor;
-    soma[v] += Math.max(0, proprios); pastas[v]++;
-  }
-  const num = v => v.toLocaleString('pt-BR');
-  document.getElementById('resumo').innerHTML = Object.keys(soma).map(k =>
-    `<span style="color:${COR[k]}">●</span> ${ROTULOS[k]}: <b>${num(soma[k])}</b> arquivos em ${num(pastas[k])} pastas`).join(' &nbsp;·&nbsp; ');
-}
-
-// ---------- busca ----------
-const busca = document.getElementById('busca'), res = document.getElementById('resultados');
-const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-busca.addEventListener('input', () => {
-  const q = norm(busca.value.trim());
-  if (q.length < 2) { res.style.display = 'none'; return; }
-  const achados = Object.values(porId).filter(n => n.depth > 0 && norm(n.data.caminho).includes(q)).slice(0, 30);
-  res.innerHTML = achados.map(n => `<div data-id="${esc(n.data.id)}">${esc(n.data.caminho)} <span style="color:#6f6a60">· ${n.data.arquivos.toLocaleString('pt-BR')}</span></div>`).join('') || '<div>Nada encontrado</div>';
-  res.style.display = 'block';
-});
-res.addEventListener('click', ev => {
-  const id = ev.target.closest('[data-id]') && ev.target.closest('[data-id]').dataset.id;
-  if (!id) return;
-  const n = porId[id];
-  // abre o caminho da raiz até a pasta; se ela estiver entre as "menores", mostra todas as irmãs
-  for (let c = n, p = n.parent; p; c = p, p = p.parent) {
-    if (!p._filhos.slice(0, MAX - 1).includes(c) && p._filhos.length > MAX) p._todos = true;
-    p.children = visiveis(p);
-  }
-  selecionado = n; res.style.display = 'none'; busca.value = '';
-  atualizarTudo();
-  const b = svg.node().getBoundingClientRect();
-  const [x, y] = [n.y * Math.cos(n.x - Math.PI / 2), n.y * Math.sin(n.x - Math.PI / 2)];
-  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(b.width / 2 - x * 1.6, b.height / 2 - y * 1.6).scale(1.6));
-});
-window.addEventListener('resize', () => raiz && desenhar());
-
-carregar();
+if (window.DADOS_TESTE) iniciar(window.DADOS_TESTE);
+else { etapa = 'lendo a planilha do Catálogo'; chamar('GET', { acao: 'dados', k: chave }).then(iniciar).catch(erroInicial); }
 </script>
 </body>
 </html>
